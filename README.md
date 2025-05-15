@@ -2,6 +2,8 @@
 
 This is a simple voice assistant built with Streamlit and OpenAI APIs. It allows users to upload an MP3 audio file and ask questions about its content. The application transcribes the audio using OpenAI's Whisper model and then uses a language model (GPT-4o-mini) to answer the user's query based on the transcription.
 
+![Voice Assistant Screenshot](image/image.png)
+
 ## Features
 
 - Upload MP3 audio files.
