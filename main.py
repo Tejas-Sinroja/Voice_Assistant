@@ -60,7 +60,7 @@ def process_audio_and_query(audio_file, query, api_key):
         return None
 
 # --- Main Application ---
-st.set_page_config(page_title="Voice Assistant", page_icon=":robot_face:", layout="wide")
+st.set_page_config(page_title="Voice Assistant", page_icon="🎙️", layout="wide")
 st.title("Voice Assistant 🎙️")
 st.info("Upload an audio file (MP3) and ask a question about its content.")
 
@@ -100,18 +100,54 @@ else:
             mime="audio/wav"
         )
 
-    query = st.text_input(
+    query_text = st.text_input(
         "What would you like to know about the audio?",
         placeholder="e.g., Summarize the key points.",
+        key="query_text_input"
     )
 
+    st.markdown("---") # Add a separator
+
+    st.write("Or record your query:")
+    query_audio_result = mic_recorder(
+        start_prompt="Start Recording Query",
+        stop_prompt="Stop Recording Query",
+        just_once=True,
+        key="query_mic_recorder"
+    )
+
+    transcribed_query = None
+    if query_audio_result and query_audio_result.get('bytes'):
+        # Transcribe the audio query
+        if st.session_state.openai_api_key:
+            try:
+                client = OpenAI(api_key=st.session_state.openai_api_key)
+                with st.spinner("Transcribing query audio..."):
+                    query_audio_file = io.BytesIO(query_audio_result['bytes'])
+                    query_audio_file.name = "query_audio.wav"
+                    transcript = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=query_audio_file
+                    )
+                transcribed_query = transcript.text
+                st.session_state.query_text_input = transcribed_query # Populate text input
+                st.success("Query transcription complete.")
+            except Exception as e:
+                st.error(f"Error transcribing query audio: {e}")
+        else:
+            st.warning("OpenAI API key is not set. Cannot transcribe query audio.")
+
+
+    # Use transcribed query if available, otherwise use text input
+    final_query = transcribed_query if transcribed_query else query_text
+
     # Process audio if available and query is entered
-    if audio_input and query:
-        response_content = process_audio_and_query(audio_input, query, st.session_state.openai_api_key)
+    if audio_input and final_query:
+        response_content = process_audio_and_query(audio_input, final_query, st.session_state.openai_api_key)
         if response_content:
             st.markdown("## Response")
             st.write(response_content)
-    elif audio_input and not query:
-        st.info("Please enter a question about the audio.")
-    elif not audio_input and query:
+    elif audio_input and not final_query:
+        st.info("Please enter a question about the audio (text or audio).")
+    elif not audio_input and final_query:
          st.info("Please upload an audio file or record audio.")
