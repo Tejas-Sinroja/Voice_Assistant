@@ -1,6 +1,10 @@
 import streamlit as st
+import time
+import time
 from openai import OpenAI
 import os
+import io
+from streamlit_mic_recorder import mic_recorder
 
 # Initialize session state for API key if it doesn't exist
 if 'openai_api_key' not in st.session_state:
@@ -65,18 +69,49 @@ setup_sidebar()
 if not st.session_state.openai_api_key:
     st.warning("Please enter your OpenAI API key in the sidebar to proceed.")
 else:
+    st.subheader("Upload an audio file or record from your microphone")
+
     audio_file = st.file_uploader("Upload an MP3 file", type=["mp3"])
+
+    st.markdown("---") # Add a separator
+
+    # Mic recorder component
+    recorded_audio_result = mic_recorder(
+        start_prompt="Start Recording",
+        stop_prompt="Stop Recording",
+        just_once=True,
+        key="mic_recorder"
+    )
+
+    audio_input = None
+    if audio_file:
+        audio_input = audio_file
+    elif recorded_audio_result and recorded_audio_result.get('bytes'):
+        audio_input = io.BytesIO(recorded_audio_result['bytes'])
+        audio_input.name = "recorded_audio.wav" # Give it a name for the API
+        st.success("Recording complete.") # Indicate completion
+
+        # Display recorded audio and download button immediately
+        st.audio(audio_input, format='audio/wav')
+        st.download_button(
+            label="Download Recording",
+            data=recorded_audio_result['bytes'],
+            file_name="recorded_audio.wav",
+            mime="audio/wav"
+        )
+
     query = st.text_input(
         "What would you like to know about the audio?",
         placeholder="e.g., Summarize the key points.",
     )
 
-    if audio_file and query:
-        response_content = process_audio_and_query(audio_file, query, st.session_state.openai_api_key)
+    # Process audio if available and query is entered
+    if audio_input and query:
+        response_content = process_audio_and_query(audio_input, query, st.session_state.openai_api_key)
         if response_content:
             st.markdown("## Response")
             st.write(response_content)
-    elif audio_file and not query:
+    elif audio_input and not query:
         st.info("Please enter a question about the audio.")
-    elif not audio_file and query:
-         st.info("Please upload an audio file.")
+    elif not audio_input and query:
+         st.info("Please upload an audio file or record audio.")
